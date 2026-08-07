@@ -93,6 +93,8 @@ def get_quote(symbol: str) -> dict:
             "market_state": info.get("marketState") or "",
             "currency": info.get("currency") or "USD",
             "dividend_yield": _num(info.get("trailingAnnualDividendYield")) or 0.0,
+            "fifty_two_high": _num(info.get("fiftyTwoWeekHigh")),
+            "fifty_two_low": _num(info.get("fiftyTwoWeekLow")),
         }
     except Exception as e:
         log.info("get_info failed for %s (%s), falling back to fast_info", sym, e)
@@ -114,6 +116,8 @@ def get_quote(symbol: str) -> dict:
             "market_state": "",
             "currency": getattr(fi, "currency", None) or "USD",
             "dividend_yield": 0.0,
+            "fifty_two_high": None,
+            "fifty_two_low": None,
         }
 
 

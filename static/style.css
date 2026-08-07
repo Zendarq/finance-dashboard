@@ -62,8 +62,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 /* ── watchlist strip ────────────────────────────────────── */
 .watch { margin-bottom: 18px; }
 .strip {
-  display: flex; gap: 10px; overflow-x: auto;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  display: flex; flex-wrap: wrap; gap: 10px;
   padding-bottom: 6px;
 }
 .strip::-webkit-scrollbar { display: none; }

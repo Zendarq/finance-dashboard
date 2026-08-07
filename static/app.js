@@ -160,6 +160,16 @@ document.addEventListener("alpine:init", () => {
       return v == null ? "—" : v.toFixed(1);
     },
 
+    /* Momentum: return % over the trailing N trading days (from 1y daily closes).
+     * Falls back to the earliest fetched point when N exceeds the window. */
+    mom(n) {
+      const d = this.sparkData[this.selected];
+      if (!d || !d.close || d.close.length < 2) return null;
+      const c = d.close;
+      const base = c.length - 1 - n >= 0 ? c.length - 1 - n : 0;
+      return c[c.length - 1] / c[base] - 1;
+    },
+
     drawSparks() {
       for (const q of this.quotes) {
         const d = this.sparkData[q.symbol];
