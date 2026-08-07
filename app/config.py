@@ -1,7 +1,7 @@
 """Options Dashboard configuration."""
 
 # Default underlyings seeded on first boot (all optionable, liquid names).
-DEFAULT_SYMBOLS = ["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "META", "AMD", "AMZN"]
+DEFAULT_SYMBOLS = ["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "META", "AMD", "AMZN", "PLTR", "MU"]
 
 # How often the scheduler refreshes quotes for the whole watchlist.
 REFRESH_MINUTES = 5
