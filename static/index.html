@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Options Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>[x-cloak]{display:none!important}</style>
+</head>
+<body x-data="dashboard" x-cloak>
+
+  <header class="top">
+    <div class="brand">
+      <h1>Options<span>Dashboard</span></h1>
+      <p class="tag">free · ~15 min delayed · Yahoo Finance</p>
+    </div>
+    <div class="hud">
+      <span class="status" :class="marketClass()">
+        <i class="dot"></i><span x-text="marketLabel()"></span>
+      </span>
+      <span class="updated">⏱ <span x-text="lastUpdated"></span></span>
+      <button class="iconbtn" @click="loadSnapshot()" :disabled="busy" title="Refresh quotes">↻</button>
+    </div>
+  </header>
+
+  <!-- ── Watchlist strip ─────────────────────────────────────────── -->
+  <section class="watch">
+    <div class="strip">
+      <template x-for="(q, i) in quotes" :key="i">
+        <div class="card" :class="{active: selected===q.symbol}" @click="select(q.symbol)">
+          <div class="card-top">
+            <span class="sym" x-text="q.symbol"></span>
+            <button class="x" @click.stop="removeSymbol(q.symbol)" title="Remove">✕</button>
+          </div>
+          <div class="nm" x-text="q.name"></div>
+          <div class="px" x-text="fmtPrice(q.price)"></div>
+          <div class="chg" :class="chgClass(q.change_pct)" x-text="fmtChg(q.change_pct)"></div>
+        </div>
+      </template>
+      <form class="card add" @submit.prevent="addSymbol">
+        <input x-model="adding" placeholder="Add ticker…" maxlength="10" autocomplete="off" spellcheck="false">
+        <button type="submit" :disabled="busy">+</button>
+      </form>
+    </div>
+    <p class="empty" x-show="!quotes.length && !busy">Loading watchlist…</p>
+  </section>
+
+  <!-- ── Selected underlying panel ───────────────────────────────── -->
+  <template x-if="selected">
+  <main>
+    <div class="hero">
+      <div class="hero-id">
+        <h2 x-text="selected"></h2>
+        <span class="nm" x-text="selName()"></span>
+      </div>
+      <div class="hero-px">
+        <span class="big" x-text="fmtPrice(selPrice())"></span>
+        <span class="chg big-chg" :class="chgClass(selQuote()?.change_pct)"
+              x-text="fmtChg(selQuote()?.change_pct)"></span>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><label>Day range</label><span x-text="fmtRange(selQuote()?.day_low, selQuote()?.day_high)"></span></div>
+        <div class="stat"><label>Volume</label><span x-text="fmtNum(selQuote()?.volume)"></span></div>
+        <div class="stat"><label>Div yield</label><span x-text="fmtPct(selQuote()?.dividend_yield)"></span></div>
+        <div class="stat"><label>Currency</label><span x-text="selQuote()?.currency || '—'"></span></div>
+      </div>
+    </div>
+
+    <!-- Trend chart -->
+    <section class="card panel">
+      <div class="panel-head">
+        <h3>Price trend</h3>
+        <div class="seg" role="group">
+          <template x-for="p in ['1mo','3mo','6mo','1y']" :key="p">
+            <button :class="{on: histPeriod===p}" @click="loadHistory(p)" x-text="p"></button>
+          </template>
+        </div>
+      </div>
+      <div class="chartbox"><canvas id="trendChart"></canvas></div>
+    </section>
+
+    <!-- Expirations -->
+    <section class="card panel">
+      <div class="panel-head">
+        <h3>Expirations</h3>
+        <span class="hint" x-text="exps.length ? exps.length + ' listed' : ''"></span>
+      </div>
+      <div class="chips" x-show="exps.length">
+        <template x-for="(e, i) in exps" :key="i">
+          <button class="chip" :class="{on: exp===e}" @click="pickExp(e)">
+            <span class="chip-d" x-text="fmtExp(e)"></span>
+            <span class="chip-dte" x-text="dte(e) + 'd'"></span>
+          </button>
+        </template>
+      </div>
+      <p class="empty" x-show="!exps.length">Loading expirations…</p>
+    </section>
+
+    <!-- Chain -->
+    <section class="card panel" x-show="chain">
+      <div class="panel-head">
+        <h3>
+          Chain
+          <span class="chain-meta" x-show="chain"
+                x-text="'exp ' + fmtExp(chain.expiration) + ' · ' + chain.dte + 'd · spot ' + fmtPrice(chain.spot)"></span>
+        </h3>
+        <button class="iconbtn" @click="loadChain(true)" :disabled="chainLoading" title="Force refresh chain">↻</button>
+      </div>
+      <p class="empty" x-show="chainLoading">Loading chain…</p>
+      <div class="table-wrap" x-show="!chainLoading && chainRows().length">
+        <table class="chain">
+          <thead>
+            <tr>
+              <th class="grp" colspan="10">CALLS</th>
+              <th class="strike-th">STRIKE</th>
+              <th class="grp" colspan="10">PUTS</th>
+            </tr>
+            <tr class="sub">
+              <template x-for="h in ['Last','Bid','Ask','IV','Δ','Γ','Θ','V','OI','Vol']" :key="h">
+                <th x-text="h"></th>
+              </template>
+              <th class="strike-th"></th>
+              <template x-for="h in ['Last','Bid','Ask','IV','Δ','Γ','Θ','V','OI','Vol']" :key="'p'+h">
+                <th x-text="h"></th>
+              </template>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(r, i) in chainRows()" :key="i">
+              <tr>
+                <template x-if="r.call">
+                  <template x-for="(c, j) in cells(r.call, 'call')" :key="'c'+i+'-'+j">
+                    <td :class="cellCls(r.call, c.k)" x-text="c.v"></td>
+                  </template>
+                </template>
+                <template x-if="!r.call">
+                  <td colspan="10" class="gap"></td>
+                </template>
+                <td class="strike" :class="{itmC: r.call?.itm, itmP: r.put?.itm}"
+                    x-text="fmtStrike(r.call ? r.call.strike : r.put?.strike)"></td>
+                <template x-if="r.put">
+                  <template x-for="(c, j) in cells(r.put, 'put')" :key="'p'+i+'-'+j">
+                    <td :class="cellCls(r.put, c.k)" x-text="c.v"></td>
+                  </template>
+                </template>
+                <template x-if="!r.put">
+                  <td colspan="10" class="gap"></td>
+                </template>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <p class="empty" x-show="!chainLoading && chain && !chainRows().length">No contracts.</p>
+    </section>
+
+    <!-- Analysis charts -->
+    <section class="grid2" x-show="chain">
+      <div class="card panel">
+        <div class="panel-head"><h3>IV smile</h3></div>
+        <div class="chartbox"><canvas id="ivChart"></canvas></div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head"><h3>Open interest by strike</h3></div>
+        <div class="chartbox"><canvas id="oiChart"></canvas></div>
+      </div>
+    </section>
+  </main>
+  </template>
+
+  <footer>
+    <p>Data: Yahoo Finance · quotes &amp; chains ≈15 min delayed · greeks computed (Black-Scholes) · free · not investment advice</p>
+  </footer>
+
+  <script src="/static/app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+</body>
+</html>

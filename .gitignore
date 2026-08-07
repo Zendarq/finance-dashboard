@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+finance.db
+finance.db-shm
+finance.db-wal
+.DS_Store
