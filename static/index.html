@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Stocks Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=4">
+  <link rel="stylesheet" href="/static/style.css?v=6">
   <style>[x-cloak]{display:none!important}</style>
 </head>
 <body x-data="dashboard" x-cloak>
@@ -75,8 +75,9 @@
         <div class="stat"><label>Day range</label><span x-text="fmtRange(selQuote()?.day_low, selQuote()?.day_high)"></span></div>
         <div class="stat"><label>Volume</label><span x-text="fmtNum(selQuote()?.volume)"></span></div>
         <div class="stat"><label>Div yield</label><span x-text="fmtPct(selQuote()?.dividend_yield)"></span></div>
-        <div class="stat"><label>52w high</label><span x-text="fmtPrice(selQuote()?.fifty_two_high)"></span></div>
-        <div class="stat"><label>52w low</label><span x-text="fmtPrice(selQuote()?.fifty_two_low)"></span></div>
+        <div class="stat"><label>52w range</label><span x-text="fmtRange(selQuote()?.fifty_two_low, selQuote()?.fifty_two_high)"></span></div>
+        <div class="stat"><label>Earnings</label><span x-text="fmtEarnings(selQuote()?.earnings_ts)"></span></div>
+        <div class="stat"><label>1y target</label><span x-text="fmtPrice(selQuote()?.target_mean)"></span></div>
         <div class="stat"><label>Mom 1M</label><span :class="chgClass(mom(22))" x-text="fmtPct(mom(22))"></span></div>
         <div class="stat"><label>Mom 3M</label><span :class="chgClass(mom(63))" x-text="fmtPct(mom(63))"></span></div>
         <div class="stat"><label>Mom 6M</label><span :class="chgClass(mom(126))" x-text="fmtPct(mom(126))"></span></div>
@@ -84,18 +85,23 @@
       </div>
     </div>
 
-    <!-- Trend chart -->
-    <section class="card panel">
+    <!-- News -->
+    <section class="panel" x-show="news.length">
       <div class="panel-head">
-        <h3>Price trend</h3>
-        <div class="seg" role="group">
-          <template x-for="p in ['1mo','3mo','6mo','1y']" :key="p">
-            <button :class="{on: histPeriod===p}" @click="loadHistory(p)" x-text="p"></button>
-          </template>
-        </div>
+        <h3>News</h3>
+        <span class="hint" x-text="news.length ? news.length + ' headlines' : ''"></span>
       </div>
-      <div class="chartbox"><canvas id="trendChart"></canvas></div>
+      <div class="news">
+        <template x-for="(n, i) in news" :key="i">
+          <a class="news-item" :href="n.link" target="_blank" rel="noopener">
+            <span class="news-title" x-text="n.title"></span>
+            <span class="news-meta" x-text="n.ts ? fmtNewsDate(n.ts) : ''"></span>
+          </a>
+        </template>
+      </div>
     </section>
+    <p class="empty" x-show="selected && !news.length"
+       x-text="newsLoading ? 'Loading news…' : 'No recent headlines.'"></p>
 
     <!-- Expirations + chain + analysis charts removed for now (backend intact). -->
   </main>
@@ -105,7 +111,7 @@
     <p>Data: Yahoo Finance · quotes ≈15 min delayed · free · not investment advice</p>
   </footer>
 
-  <script src="/static/app.js?v=6" defer></script>
+  <script src="/static/app.js?v=7" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
 </body>
 </html>

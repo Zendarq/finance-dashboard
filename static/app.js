@@ -19,11 +19,10 @@ document.addEventListener("alpine:init", () => {
     lastTs: null,
     busy: false,
     selected: null,
-    history: null,
-    histPeriod: "3mo",
+    news: [],
+    newsLoading: false,
     adding: "",
     pollTimer: null,
-    charts: { trend: null },
     sparkData: {},      // SYM -> {labels, close} (1y daily)
     sparkCharts: {},    // SYM -> Chart instance
     smaVals: {},        // SYM -> {10: v, 50: v, 100: v, 200: v}
@@ -36,7 +35,7 @@ document.addEventListener("alpine:init", () => {
         this.loadSnapshot(true);
         this.loadSparks();
       }, POLL_MS);
-      this.$watch("selected", () => this.loadHistory(this.histPeriod));
+      this.$watch("selected", () => this.loadNews());
       this.loadSnapshot().then(() => this.loadSparks());
     },
     destroy() {
@@ -68,16 +67,16 @@ document.addEventListener("alpine:init", () => {
       if (sym !== this.selected) this.selected = sym;
     },
 
-    async loadHistory(period) {
+    async loadNews() {
       if (!this.selected) return;
-      this.histPeriod = period;
+      this.newsLoading = true;
       try {
-        const d = await (await fetch(`/api/history?symbol=${this.selected}&period=${period}`)).json();
-        this.history = d;
-        this.$nextTick(() => requestAnimationFrame(() => this.drawTrend()));
+        const d = await (await fetch(`/api/news?symbol=${this.selected}`)).json();
+        this.news = Array.isArray(d) ? d : [];
       } catch (e) {
-        /* ignore */
+        this.news = [];
       }
+      this.newsLoading = false;
     },
 
     async addSymbol() {
@@ -237,6 +236,14 @@ document.addEventListener("alpine:init", () => {
       return this.fmtPrice(lo) + " – " + this.fmtPrice(hi);
     },
 
+    fmtEarnings(ts) {
+      if (!ts) return "—";
+      return new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    },
+    fmtNewsDate(ts) {
+      return new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    },
+
     /* ---------- derived ---------- */
     selQuote() {
       return this.quotes.find((q) => q.symbol === this.selected) || null;
@@ -266,47 +273,6 @@ document.addEventListener("alpine:init", () => {
     get lastUpdated() {
       if (!this.lastTs) return "—";
       return new Date(this.lastTs * 1000).toLocaleTimeString("en-US", { hour12: false });
-    },
-
-    /* ---------- charts ---------- */
-    drawTrend() {
-      const el = document.getElementById("trendChart");
-      if (!el || !this.history) return;
-      if (this.charts.trend) this.charts.trend.destroy();
-      const h = this.history;
-      this.charts.trend = new Chart(el, {
-        type: "line",
-        data: {
-          labels: h.labels,
-          datasets: [{
-            label: this.selected,
-            data: h.close,
-            borderColor: "#38bdf8",
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.25,
-            fill: true,
-            backgroundColor: (c) => {
-              const { ctx, chartArea } = c.chart;
-              if (!chartArea) return "rgba(56,189,248,0)";
-              const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-              g.addColorStop(0, "rgba(56,189,248,.22)");
-              g.addColorStop(1, "rgba(56,189,248,0)");
-              return g;
-            },
-          }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: "index", intersect: false },
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { maxTicksLimit: 8, color: "#64748b" }, grid: { color: "rgba(148,163,184,.08)" } },
-            y: { position: "right", ticks: { color: "#64748b" }, grid: { color: "rgba(148,163,184,.08)" } },
-          },
-        },
-      });
     },
   }));
 });

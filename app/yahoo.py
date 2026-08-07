@@ -9,7 +9,10 @@ import logging
 import threading
 import time
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from xml.etree import ElementTree as ET
 
+import httpx
 import yfinance as yf
 
 from . import config, greeks
@@ -95,6 +98,8 @@ def get_quote(symbol: str) -> dict:
             "dividend_yield": _num(info.get("trailingAnnualDividendYield")) or 0.0,
             "fifty_two_high": _num(info.get("fiftyTwoWeekHigh")),
             "fifty_two_low": _num(info.get("fiftyTwoWeekLow")),
+            "earnings_ts": _num(info.get("earningsTimestamp")),
+            "target_mean": _num(info.get("targetMeanPrice")),
         }
     except Exception as e:
         log.info("get_info failed for %s (%s), falling back to fast_info", sym, e)
@@ -118,6 +123,8 @@ def get_quote(symbol: str) -> dict:
             "dividend_yield": 0.0,
             "fifty_two_high": None,
             "fifty_two_low": None,
+            "earnings_ts": None,
+            "target_mean": None,
         }
 
 
@@ -153,6 +160,41 @@ def get_history(symbol: str, period: str = "3mo") -> dict:
         return _cached(f"hist:{symbol}:{period}", config.HISTORY_TTL_SECONDS, fetch)
     except Exception as e:
         raise RuntimeError(f"Couldn't load history for {symbol}: {e}") from e
+
+
+NEWS_TTL_SECONDS = 900  # news is slow-moving; 15 min cache
+
+
+def get_news(symbol: str, limit: int = 20) -> list[dict]:
+    """Headlines for a symbol from Yahoo's free public RSS feed (no key)."""
+
+    def fetch():
+        url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
+        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+        r = httpx.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+        root = ET.fromstring(r.text)
+        items = []
+        for it in root.iter("item"):
+            title = (it.findtext("title") or "").strip()
+            link = (it.findtext("link") or "").strip()
+            pub = it.findtext("pubDate")
+            ts = None
+            if pub:
+                try:
+                    ts = int(parsedate_to_datetime(pub).timestamp())
+                except (ValueError, TypeError):
+                    ts = None
+            if title and link:
+                items.append({"title": title, "link": link, "ts": ts})
+            if len(items) >= limit:
+                break
+        return items
+
+    try:
+        return _cached(f"news:{symbol}", NEWS_TTL_SECONDS, fetch)
+    except Exception as e:
+        raise RuntimeError(f"Couldn't load news for {symbol}: {e}") from e
 
 
 def get_chain(symbol: str, exp: str, force: bool = False) -> dict:

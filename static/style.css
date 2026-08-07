@@ -131,11 +131,23 @@ main { display: flex; flex-direction: column; gap: 14px; }
 .stat label { color: var(--faint); font-size: 12px; }
 .stat span { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; width: 100%; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .panel-head h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chain-meta { color: var(--faint); font-size: 12px; font-weight: 400; }
 .hint { color: var(--faint); font-size: 12px; }
+
+/* news list */
+.news { display: flex; flex-direction: column; gap: 2px; }
+.news-item {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 4px; border-top: 1px solid var(--line);
+  text-decoration: none;
+}
+.news-item:first-child { border-top: 0; }
+.news-item:hover .news-title { color: var(--accent); }
+.news-title { color: var(--text); font-size: 14px; line-height: 1.4; }
+.news-meta { color: var(--faint); font-size: 11px; }
 
 /* period segments */
 .seg { display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }

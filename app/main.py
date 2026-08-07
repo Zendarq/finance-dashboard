@@ -105,6 +105,14 @@ def history(symbol: str, period: str = "3mo"):
         raise HTTPException(502, str(e))
 
 
+@app.get("/api/news")
+def news(symbol: str):
+    try:
+        return yahoo.get_news(symbol.upper())
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+
+
 class AddReq(BaseModel):
     symbol: str
 

@@ -39,7 +39,9 @@ def init_db() -> None:
                 currency       TEXT,
                 dividend_yield REAL,
                 fifty_two_high REAL,
-                fifty_two_low  REAL
+                fifty_two_low  REAL,
+                earnings_ts    INTEGER,
+                target_mean    REAL
             )"""
         )
         # Lightweight migration for databases created before these columns existed.
@@ -47,6 +49,9 @@ def init_db() -> None:
         if "fifty_two_high" not in cols:
             c.execute("ALTER TABLE quotes ADD COLUMN fifty_two_high REAL")
             c.execute("ALTER TABLE quotes ADD COLUMN fifty_two_low REAL")
+        if "earnings_ts" not in cols:
+            c.execute("ALTER TABLE quotes ADD COLUMN earnings_ts INTEGER")
+            c.execute("ALTER TABLE quotes ADD COLUMN target_mean REAL")
 
 
 def seed_watchlist(symbols: list[str]) -> None:
@@ -88,10 +93,10 @@ def upsert_quote(q: dict) -> None:
             """INSERT OR REPLACE INTO quotes
               (symbol, ts, price, prev_close, change_pct, day_high, day_low,
                volume, market_state, currency, dividend_yield,
-               fifty_two_high, fifty_two_low)
+               fifty_two_high, fifty_two_low, earnings_ts, target_mean)
               VALUES (:symbol, :ts, :price, :prev_close, :change_pct, :day_high,
                       :day_low, :volume, :market_state, :currency, :dividend_yield,
-                      :fifty_two_high, :fifty_two_low)""",
+                      :fifty_two_high, :fifty_two_low, :earnings_ts, :target_mean)""",
             q,
         )
 
