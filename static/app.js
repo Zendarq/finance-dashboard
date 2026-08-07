@@ -1,8 +1,10 @@
-/* Options Dashboard frontend — Alpine.js component.
+/* Stocks Dashboard frontend — Alpine.js component.
  * NOTE: this file must be loaded BEFORE the Alpine CDN script (see skill:
  * Alpine 3.14+ boots via queueMicrotask and misses late alpine:init listeners). */
 
 const POLL_MS = 60000;
+const SMA_PERIODS = [10, 50, 100, 200];
+const SMA_COLORS = { 10: "#facc15", 50: "#fb923c", 100: "#a78bfa", 200: "#2dd4bf" };
 
 if (window.Chart) {
   Chart.defaults.font.family = "'SF Mono', ui-monospace, Menlo, monospace";
@@ -17,24 +19,29 @@ document.addEventListener("alpine:init", () => {
     lastTs: null,
     busy: false,
     selected: null,
-    exps: [],
-    exp: null,
-    chain: null,
-    chainLoading: false,
     history: null,
     histPeriod: "3mo",
     adding: "",
     pollTimer: null,
-    charts: { trend: null, iv: null, oi: null },
+    charts: { trend: null },
+    sparkData: {},      // SYM -> {labels, close} (1y daily)
+    sparkCharts: {},    // SYM -> Chart instance
+    smaVals: {},        // SYM -> {10: v, 50: v, 100: v, 200: v}
+    smaPeriods: SMA_PERIODS,
+    smaColors: SMA_COLORS,
 
     /* ---------- lifecycle ---------- */
     init() {
-      this.loadSnapshot();
-      this.pollTimer = setInterval(() => this.loadSnapshot(true), POLL_MS);
-      this.$watch("selected", () => this.onSelect());
+      this.pollTimer = setInterval(() => {
+        this.loadSnapshot(true);
+        this.loadSparks();
+      }, POLL_MS);
+      this.$watch("selected", () => this.loadHistory(this.histPeriod));
+      this.loadSnapshot().then(() => this.loadSparks());
     },
     destroy() {
       if (this.pollTimer) clearInterval(this.pollTimer);
+      Object.values(this.sparkCharts).forEach((c) => c && c.destroy());
     },
 
     /* ---------- data loading ---------- */
@@ -50,6 +57,7 @@ document.addEventListener("alpine:init", () => {
         } else if (!this.selected && this.quotes.length) {
           this.selected = this.quotes[0].symbol;
         }
+        this.$nextTick(() => requestAnimationFrame(() => this.drawSparks()));
       } catch (e) {
         /* keep last good data */
       }
@@ -58,25 +66,6 @@ document.addEventListener("alpine:init", () => {
 
     select(sym) {
       if (sym !== this.selected) this.selected = sym;
-    },
-
-    async onSelect() {
-      if (!this.selected) return;
-      this.chain = null;
-      this.exp = null;
-      this.exps = [];
-      this.loadHistory(this.histPeriod);
-      try {
-        const d = await (await fetch(`/api/expirations?symbol=${this.selected}`)).json();
-        this.exps = d.dates || [];
-        if (this.exps.length) {
-          // Skip 0-DTE (today) so greeks render on first view.
-          const first = this.exps.find((e) => this.dte(e) >= 1) || this.exps[0];
-          this.pickExp(first);
-        }
-      } catch (e) {
-        this.exps = [];
-      }
     },
 
     async loadHistory(period) {
@@ -89,25 +78,6 @@ document.addEventListener("alpine:init", () => {
       } catch (e) {
         /* ignore */
       }
-    },
-
-    pickExp(e) {
-      this.exp = e;
-      this.loadChain(false);
-    },
-
-    async loadChain(force = false) {
-      if (!this.selected || !this.exp) return;
-      this.chainLoading = true;
-      try {
-        const q = `symbol=${this.selected}&exp=${this.exp}${force ? "&force=true" : ""}`;
-        const d = await (await fetch("/api/chain?" + q)).json();
-        this.chain = d;
-        this.$nextTick(() => requestAnimationFrame(() => this.drawCharts()));
-      } catch (e) {
-        this.chain = null;
-      }
-      this.chainLoading = false;
     },
 
     async addSymbol() {
@@ -126,6 +96,7 @@ document.addEventListener("alpine:init", () => {
         } else {
           this.adding = "";
           await this.loadSnapshot();
+          await this.loadSparks();
           this.select(sym);
         }
       } catch (e) {
@@ -139,6 +110,12 @@ document.addEventListener("alpine:init", () => {
       this.busy = true;
       try {
         await fetch("/api/watchlist/" + sym, { method: "DELETE" });
+        if (this.sparkCharts[sym]) {
+          this.sparkCharts[sym].destroy();
+          delete this.sparkCharts[sym];
+        }
+        delete this.sparkData[sym];
+        delete this.smaVals[sym];
         await this.loadSnapshot();
       } catch (e) {
         /* ignore */
@@ -146,36 +123,78 @@ document.addEventListener("alpine:init", () => {
       this.busy = false;
     },
 
-    /* ---------- chain helpers ---------- */
-    chainRows() {
-      if (!this.chain) return [];
-      const puts = new Map(this.chain.puts.map((p) => [p.strike, p]));
-      return this.chain.calls.map((c) => ({ call: c, put: puts.get(c.strike) || null }));
+    /* ---------- sparkline + SMA ---------- */
+    sma(arr, n) {
+      const out = new Array(arr.length).fill(null);
+      let sum = 0;
+      for (let i = 0; i < arr.length; i++) {
+        sum += arr[i];
+        if (i >= n) sum -= arr[i - n];
+        if (i >= n - 1) out[i] = sum / n;
+      }
+      return out;
     },
 
-    cells(c, kind) {
-      const g = c.greeks || {};
-      const fmt = (v, d) => (v == null ? "—" : Number(v).toFixed(d));
-      // Zero/absent bid-ask (e.g. pre-market, no live quotes) renders as "—".
-      const px = (v) => (v == null || v <= 0 ? "—" : this.fmtPrice(v));
-      return [
-        { k: "last", v: this.fmtPrice(c.last) },
-        { k: "bid", v: px(c.bid) },
-        { k: "ask", v: px(c.ask) },
-        { k: "iv", v: c.iv == null ? "—" : c.iv.toFixed(1) + "%" },
-        { k: "delta", v: fmt(g.delta, 2) },
-        { k: "gamma", v: g.gamma == null ? "—" : (Math.abs(g.gamma) >= 1 ? g.gamma.toFixed(2) : g.gamma.toFixed(4)) },
-        { k: "theta", v: fmt(g.theta, 3) },
-        { k: "vega", v: fmt(g.vega, 2) },
-        { k: "oi", v: this.fmtNum(c.oi) },
-        { k: "vol", v: this.fmtNum(c.volume) },
-      ];
+    async loadSparks() {
+      if (!this.quotes.length) return;
+      const syms = this.quotes.map((q) => q.symbol);
+      const results = await Promise.allSettled(
+        syms.map((s) => fetch(`/api/history?symbol=${s}&period=1y`).then((r) => r.json()))
+      );
+      results.forEach((r, i) => {
+        const s = syms[i];
+        if (r.status !== "fulfilled" || !r.value?.close || r.value.close.length < 200) return;
+        this.sparkData[s] = r.value;
+        const vals = {};
+        for (const p of SMA_PERIODS) {
+          const series = this.sma(r.value.close, p);
+          vals[p] = series[series.length - 1];
+        }
+        this.smaVals[s] = vals;
+      });
+      this.$nextTick(() => requestAnimationFrame(() => this.drawSparks()));
     },
 
-    cellCls(c, k) {
-      const cls = ["num"];
-      if ((k === "last" || k === "oi" || k === "vol") && c[k] == null) cls.push("muted");
-      return cls.join(" ");
+    smaVal(sym, p) {
+      const v = this.smaVals[sym]?.[p];
+      return v == null ? "—" : v.toFixed(1);
+    },
+
+    drawSparks() {
+      for (const q of this.quotes) {
+        const d = this.sparkData[q.symbol];
+        const el = document.querySelector(`.card canvas[data-sym="${q.symbol}"]`);
+        if (!el || !d || !d.close.length) continue;
+        if (this.sparkCharts[q.symbol]) {
+          this.sparkCharts[q.symbol].destroy();
+          delete this.sparkCharts[q.symbol];
+        }
+        const N = 30; // trailing 30 trading days
+        const datasets = [
+          { label: q.symbol, data: d.close.slice(-N), borderColor: "#38bdf8", borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+        ];
+        for (const p of SMA_PERIODS) {
+          datasets.push({
+            label: "SMA" + p,
+            data: this.sma(d.close, p).slice(-N),
+            borderColor: SMA_COLORS[p],
+            borderWidth: 1,
+            pointRadius: 0,
+            tension: 0.2,
+          });
+        }
+        this.sparkCharts[q.symbol] = new Chart(el, {
+          type: "line",
+          data: { labels: d.labels.slice(-N), datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { x: { display: false }, y: { display: false } },
+          },
+        });
+      }
     },
 
     /* ---------- formatters ---------- */
@@ -206,15 +225,6 @@ document.addEventListener("alpine:init", () => {
     fmtRange(lo, hi) {
       if (lo == null || hi == null) return "—";
       return this.fmtPrice(lo) + " – " + this.fmtPrice(hi);
-    },
-    fmtExp(e) {
-      return new Date(e + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    },
-    fmtStrike(v) {
-      return v == null ? "—" : Number(v).toFixed(2);
-    },
-    dte(e) {
-      return Math.max(0, Math.round((new Date(e + "T00:00:00") - Date.now()) / 86400000));
     },
 
     /* ---------- derived ---------- */
@@ -249,11 +259,6 @@ document.addEventListener("alpine:init", () => {
     },
 
     /* ---------- charts ---------- */
-    drawCharts() {
-      this.drawIv();
-      this.drawOi();
-    },
-
     drawTrend() {
       const el = document.getElementById("trendChart");
       if (!el || !this.history) return;
@@ -289,68 +294,6 @@ document.addEventListener("alpine:init", () => {
           scales: {
             x: { ticks: { maxTicksLimit: 8, color: "#64748b" }, grid: { color: "rgba(148,163,184,.08)" } },
             y: { position: "right", ticks: { color: "#64748b" }, grid: { color: "rgba(148,163,184,.08)" } },
-          },
-        },
-      });
-    },
-
-    drawIv() {
-      const el = document.getElementById("ivChart");
-      if (!el || !this.chain) return;
-      if (this.charts.iv) this.charts.iv.destroy();
-      const strikes = this.chain.calls.map((c) => c.strike);
-      const putIv = new Map(this.chain.puts.map((p) => [p.strike, p.iv]));
-      this.charts.iv = new Chart(el, {
-        type: "line",
-        data: {
-          labels: strikes,
-          datasets: [
-            { label: "calls", data: this.chain.calls.map((c) => c.iv), borderColor: "#38bdf8", backgroundColor: "#38bdf8", pointRadius: 2, borderWidth: 2, tension: 0.2 },
-            { label: "puts", data: strikes.map((s) => putIv.get(s) ?? null), borderColor: "#fbbf24", backgroundColor: "#fbbf24", pointRadius: 2, borderWidth: 2, tension: 0.2 },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: "index", intersect: false },
-          plugins: {
-            legend: { labels: { boxWidth: 10, boxHeight: 10 } },
-            tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y?.toFixed(1)}%` } },
-          },
-          scales: {
-            x: { title: { display: true, text: "strike" }, ticks: { color: "#64748b" }, grid: { color: "rgba(148,163,184,.08)" } },
-            y: { title: { display: true, text: "IV" }, ticks: { color: "#64748b", callback: (v) => v + "%" }, grid: { color: "rgba(148,163,184,.08)" } },
-          },
-        },
-      });
-    },
-
-    drawOi() {
-      const el = document.getElementById("oiChart");
-      if (!el || !this.chain) return;
-      if (this.charts.oi) this.charts.oi.destroy();
-      const strikes = this.chain.calls.map((c) => c.strike);
-      const putOi = new Map(this.chain.puts.map((p) => [p.strike, p.oi ?? 0]));
-      this.charts.oi = new Chart(el, {
-        type: "bar",
-        data: {
-          labels: strikes,
-          datasets: [
-            { label: "calls OI", data: this.chain.calls.map((c) => c.oi ?? 0), backgroundColor: "rgba(56,189,248,.65)" },
-            { label: "puts OI", data: strikes.map((s) => -(putOi.get(s) ?? 0)), backgroundColor: "rgba(251,191,36,.65)" },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: "index", intersect: false },
-          plugins: {
-            legend: { labels: { boxWidth: 10, boxHeight: 10 } },
-            tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${Math.abs(c.parsed.y).toLocaleString()}` } },
-          },
-          scales: {
-            x: { ticks: { color: "#64748b", maxRotation: 60, autoSkip: true, maxTicksLimit: 12 }, grid: { color: "rgba(148,163,184,.08)" } },
-            y: { ticks: { color: "#64748b", callback: (v) => Math.abs(v).toLocaleString() }, grid: { color: "rgba(148,163,184,.08)" } },
           },
         },
       });

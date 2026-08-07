@@ -90,6 +90,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 .chg.down { color: var(--down); }
 .chg.flat { color: var(--muted); }
 
+/* card sparkline + SMA legend */
+.sparkbox { height: 62px; margin: 4px 0 6px; position: relative; }
+.spark { width: 100%; height: 100%; display: block; }
+.sma-legend { display: flex; gap: 8px 10px; margin-top: 6px; flex-wrap: wrap; }
+.sma-item { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.sma-item .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.sma-item b { color: var(--muted); font-weight: 600; }
+.sma-item em { font-style: normal; }
+
 .card.add {
   display: flex; align-items: center; gap: 8px; cursor: default; width: 170px;
 }
