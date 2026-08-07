@@ -159,6 +159,13 @@ document.addEventListener("alpine:init", () => {
       return v == null ? "—" : v.toFixed(1);
     },
 
+    /* Points moved today (price − prev close), complements the % change. */
+    chgPts(q) {
+      if (!q || q.price == null || q.prev_close == null) return "—";
+      const pts = q.price - q.prev_close;
+      return (pts > 0 ? "+" : "") + pts.toFixed(2);
+    },
+
     /* Momentum: return % over the trailing N trading days (from 1y daily closes).
      * Falls back to the earliest fetched point when N exceeds the window. */
     mom(n) {

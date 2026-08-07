@@ -85,6 +85,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .nm { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 2px 0 6px; }
 .px { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .chg { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chg b { font-weight: 700; }
+.chg em { font-style: normal; opacity: 0.85; margin-left: 3px; }
 .chg.up { color: var(--up); }
 .chg.down { color: var(--down); }
 .chg.flat { color: var(--muted); }

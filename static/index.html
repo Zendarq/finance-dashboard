@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Stocks Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=6">
+  <link rel="stylesheet" href="/static/style.css?v=7">
   <style>[x-cloak]{display:none!important}</style>
 </head>
 <body x-data="dashboard" x-cloak>
@@ -38,7 +38,9 @@
           <div class="nm" x-text="q.name"></div>
           <div class="sparkbox"><canvas class="spark" :data-sym="q.symbol"></canvas></div>
           <div class="px" x-text="fmtPrice(q.price)"></div>
-          <div class="chg" :class="chgClass(q.change_pct)" x-text="fmtChg(q.change_pct)"></div>
+          <div class="chg" :class="chgClass(q.change_pct)">
+            <b x-text="chgPts(q)"></b><em x-text="fmtChg(q.change_pct)"></em>
+          </div>
           <div class="sma-legend">
             <template x-for="p in smaPeriods" :key="p">
               <span class="sma-item">
@@ -111,7 +113,7 @@
     <p>Data: Yahoo Finance · quotes ≈15 min delayed · free · not investment advice</p>
   </footer>
 
-  <script src="/static/app.js?v=7" defer></script>
+  <script src="/static/app.js?v=8" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
 </body>
 </html>
