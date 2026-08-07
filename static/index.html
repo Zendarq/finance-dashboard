@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Options Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=2">
   <style>[x-cloak]{display:none!important}</style>
 </head>
 <body x-data="dashboard" x-cloak>
@@ -105,7 +105,7 @@
         <h3>
           Chain
           <span class="chain-meta" x-show="chain"
-                x-text="'exp ' + fmtExp(chain.expiration) + ' · ' + chain.dte + 'd · spot ' + fmtPrice(chain.spot)"></span>
+                x-text="chain ? ('exp ' + fmtExp(chain.expiration) + ' · ' + chain.dte + 'd · spot ' + fmtPrice(chain.spot)) : ''"></span>
         </h3>
         <button class="iconbtn" @click="loadChain(true)" :disabled="chainLoading" title="Force refresh chain">↻</button>
       </div>
@@ -175,7 +175,7 @@
     <p>Data: Yahoo Finance · quotes &amp; chains ≈15 min delayed · greeks computed (Black-Scholes) · free · not investment advice</p>
   </footer>
 
-  <script src="/static/app.js" defer></script>
+  <script src="/static/app.js?v=3" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
 </body>
 </html>

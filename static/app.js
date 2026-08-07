@@ -69,7 +69,11 @@ document.addEventListener("alpine:init", () => {
       try {
         const d = await (await fetch(`/api/expirations?symbol=${this.selected}`)).json();
         this.exps = d.dates || [];
-        if (this.exps.length) this.pickExp(this.exps[0]);
+        if (this.exps.length) {
+          // Skip 0-DTE (today) so greeks render on first view.
+          const first = this.exps.find((e) => this.dte(e) >= 1) || this.exps[0];
+          this.pickExp(first);
+        }
       } catch (e) {
         this.exps = [];
       }
@@ -152,10 +156,12 @@ document.addEventListener("alpine:init", () => {
     cells(c, kind) {
       const g = c.greeks || {};
       const fmt = (v, d) => (v == null ? "—" : Number(v).toFixed(d));
+      // Zero/absent bid-ask (e.g. pre-market, no live quotes) renders as "—".
+      const px = (v) => (v == null || v <= 0 ? "—" : this.fmtPrice(v));
       return [
         { k: "last", v: this.fmtPrice(c.last) },
-        { k: "bid", v: this.fmtPrice(c.bid) },
-        { k: "ask", v: this.fmtPrice(c.ask) },
+        { k: "bid", v: px(c.bid) },
+        { k: "ask", v: px(c.ask) },
         { k: "iv", v: c.iv == null ? "—" : c.iv.toFixed(1) + "%" },
         { k: "delta", v: fmt(g.delta, 2) },
         { k: "gamma", v: g.gamma == null ? "—" : (Math.abs(g.gamma) >= 1 ? g.gamma.toFixed(2) : g.gamma.toFixed(4)) },
