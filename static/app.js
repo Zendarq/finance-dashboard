@@ -22,6 +22,8 @@ document.addEventListener("alpine:init", () => {
     news: [],
     newsLoading: false,
     adding: "",
+    confirming: null,
+    confirmTimer: null,
     pollTimer: null,
     sparkData: {},      // SYM -> {labels, close} (1y daily)
     sparkCharts: {},    // SYM -> Chart instance
@@ -37,6 +39,7 @@ document.addEventListener("alpine:init", () => {
       }, POLL_MS);
       this.$watch("selected", () => this.loadNews());
       this.loadSnapshot().then(() => this.loadSparks());
+      this.initDrag();
     },
     destroy() {
       if (this.pollTimer) clearInterval(this.pollTimer);
@@ -102,6 +105,61 @@ document.addEventListener("alpine:init", () => {
         alert("Couldn't add " + sym);
       }
       this.busy = false;
+    },
+
+    /* ---------- drag to reorder ---------- */
+    initDrag() {
+      const strip = this.$root.querySelector(".strip");
+      if (!strip || !window.Sortable) return;
+      Sortable.create(strip, {
+        draggable: ".card:not(.add)",
+        filter: ".x",
+        animation: 160,
+        ghostClass: "drag-ghost",
+        delay: 120,             // small touch delay so page scroll still wins
+        delayOnTouchOnly: true,
+        onEnd: () => this.commitOrder(),
+      });
+    },
+    async commitOrder() {
+      const strip = this.$root.querySelector(".strip");
+      const order = [...strip.querySelectorAll(".card[data-sym]")].map((el) => el.dataset.sym);
+      const bySym = {};
+      this.quotes.forEach((q) => (bySym[q.symbol] = q));
+      const next = order.map((s) => bySym[s]).filter(Boolean);
+      try {
+        await fetch("/api/watchlist/order", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbols: order }),
+        });
+      } catch (e) { /* non-fatal */ }
+      // Sortable's physical node moves corrupt Alpine's keyed x-for diffing,
+      // so force a full teardown/rebuild of the strip instead of a reorder diff.
+      this.busy = true;
+      Object.values(this.sparkCharts).forEach((c) => { try { c && c.destroy(); } catch (e) {} });
+      this.sparkCharts = {};
+      this.quotes = [];
+      this.$nextTick(() => {
+        this.quotes = next;
+        this.$nextTick(() => {
+          this.busy = false;
+          this.loadSparks();
+        });
+      });
+    },
+
+    /* ---------- remove (two-step confirm) ---------- */
+    askRemove(sym) {
+      if (this.confirming === sym) {
+        clearTimeout(this.confirmTimer);
+        this.confirming = null;
+        this.removeSymbol(sym);
+        return;
+      }
+      this.confirming = sym;
+      clearTimeout(this.confirmTimer);
+      this.confirmTimer = setTimeout(() => (this.confirming = null), 3000);
     },
 
     async removeSymbol(sym) {
@@ -182,7 +240,7 @@ document.addEventListener("alpine:init", () => {
         const el = document.querySelector(`.card canvas[data-sym="${q.symbol}"]`);
         if (!el || !d || !d.close.length) continue;
         if (this.sparkCharts[q.symbol]) {
-          this.sparkCharts[q.symbol].destroy();
+          try { this.sparkCharts[q.symbol].destroy(); } catch (e) {}
           delete this.sparkCharts[q.symbol];
         }
         const N = 30; // trailing 30 trading days

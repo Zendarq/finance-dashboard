@@ -132,6 +132,16 @@ def add_watch(req: AddReq):
     return {"ok": True, "symbol": sym}
 
 
+class ReorderReq(BaseModel):
+    symbols: list[str]
+
+
+@app.put("/api/watchlist/order")
+def reorder(req: ReorderReq):
+    db.reorder_watch(req.symbols)
+    return {"ok": True}
+
+
 @app.delete("/api/watchlist/{symbol}")
 def remove_watch(symbol: str):
     db.remove_watch(symbol.upper())

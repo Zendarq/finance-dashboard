@@ -82,6 +82,13 @@ button:disabled { opacity: 0.5; cursor: default; }
   display: inline-flex; align-items: center; justify-content: center; font-size: 13px;
 }
 .x:active { background: rgba(251, 113, 133, 0.15); color: var(--down); }
+.x.sure {
+  width: auto; padding: 0 7px; font-weight: 700; font-size: 11px;
+  background: rgba(251, 113, 133, 0.15); color: var(--down);
+}
+.card { cursor: grab; }
+.card.drag-ghost { opacity: 0.35; }
+.card.sortable-chosen { border-color: var(--accent); }
 .nm { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 2px 0 6px; }
 .px { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .chg { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }

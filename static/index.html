@@ -7,7 +7,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Stocks Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=7">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css?v=8">
   <style>[x-cloak]{display:none!important}</style>
 </head>
 <body x-data="dashboard" x-cloak>
@@ -29,11 +30,13 @@
   <!-- ── Watchlist strip ─────────────────────────────────────────── -->
   <section class="watch">
     <div class="strip">
-      <template x-for="(q, i) in quotes" :key="i">
-        <div class="card" :class="{active: selected===q.symbol}" @click="select(q.symbol)">
+      <template x-for="q in quotes" :key="q.symbol">
+        <div class="card" :class="{active: selected===q.symbol}" :data-sym="q.symbol" @click="select(q.symbol)">
           <div class="card-top">
             <span class="sym" x-text="q.symbol"></span>
-            <button class="x" @click.stop="removeSymbol(q.symbol)" title="Remove">✕</button>
+            <button class="x" :class="{sure: confirming===q.symbol}" @click.stop="askRemove(q.symbol)"
+                    x-text="confirming===q.symbol ? 'Sure?' : '✕'"
+                    :title="confirming===q.symbol ? 'Click again to remove' : 'Remove'"></button>
           </div>
           <div class="nm" x-text="q.name"></div>
           <div class="sparkbox"><canvas class="spark" :data-sym="q.symbol"></canvas></div>
@@ -113,7 +116,7 @@
     <p>Data: Yahoo Finance · quotes ≈15 min delayed · free · not investment advice</p>
   </footer>
 
-  <script src="/static/app.js?v=8" defer></script>
+  <script src="/static/app.js?v=11" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
 </body>
 </html>
