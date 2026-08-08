@@ -224,6 +224,20 @@ document.addEventListener("alpine:init", () => {
       return (pts > 0 ? "+" : "") + pts.toFixed(2);
     },
 
+    /* Open Google Finance for a symbol in a new tab (dblclick on card).
+     * Yahoo exchange codes -> Google Finance exchange suffixes. */
+    openGoogleFinance(q) {
+      if (!q) return;
+      const gf = { NMS: "NASDAQ", NGM: "NASDAQ", NCM: "NASDAQ",
+                   NYQ: "NYSE", PCX: "NYSEARCA", ARC: "NYSEARCA",
+                   ASE: "AMEX", AMX: "AMEX" };
+      const exch = gf[q.exchange];
+      const url = exch
+        ? `https://www.google.com/finance/quote/${q.symbol}:${exch}`
+        : `https://www.google.com/finance/search?q=${q.symbol}`;
+      window.open(url, "_blank", "noopener");
+    },
+
     /* Momentum: return % over the trailing N trading days (from 1y daily closes).
      * Falls back to the earliest fetched point when N exceeds the window. */
     mom(n) {

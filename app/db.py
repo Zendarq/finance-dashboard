@@ -38,6 +38,7 @@ def init_db() -> None:
                 volume         INTEGER,
                 market_state   TEXT,
                 currency       TEXT,
+                exchange       TEXT,
                 dividend_yield REAL,
                 fifty_two_high REAL,
                 fifty_two_low  REAL,
@@ -51,6 +52,8 @@ def init_db() -> None:
             c.execute("ALTER TABLE watchlist ADD COLUMN pos INTEGER")
             c.execute("UPDATE watchlist SET pos = rowid")  # keep current insertion order
         cols = {r[1] for r in c.execute("PRAGMA table_info(quotes)")}
+        if "exchange" not in cols:
+            c.execute("ALTER TABLE quotes ADD COLUMN exchange TEXT")
         if "fifty_two_high" not in cols:
             c.execute("ALTER TABLE quotes ADD COLUMN fifty_two_high REAL")
             c.execute("ALTER TABLE quotes ADD COLUMN fifty_two_low REAL")
@@ -118,11 +121,12 @@ def upsert_quote(q: dict) -> None:
         c.execute(
             """INSERT OR REPLACE INTO quotes
               (symbol, ts, price, prev_close, change_pct, day_high, day_low,
-               volume, market_state, currency, dividend_yield,
+               volume, market_state, currency, exchange, dividend_yield,
                fifty_two_high, fifty_two_low, earnings_ts, target_mean)
               VALUES (:symbol, :ts, :price, :prev_close, :change_pct, :day_high,
-                      :day_low, :volume, :market_state, :currency, :dividend_yield,
-                      :fifty_two_high, :fifty_two_low, :earnings_ts, :target_mean)""",
+                      :day_low, :volume, :market_state, :currency, :exchange,
+                      :dividend_yield, :fifty_two_high, :fifty_two_low,
+                      :earnings_ts, :target_mean)""",
             q,
         )
 
