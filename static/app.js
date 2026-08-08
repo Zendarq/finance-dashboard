@@ -224,18 +224,10 @@ document.addEventListener("alpine:init", () => {
       return (pts > 0 ? "+" : "") + pts.toFixed(2);
     },
 
-    /* Open Google Finance for a symbol in a new tab (dblclick on card).
-     * Yahoo exchange codes -> Google Finance exchange suffixes. */
-    openGoogleFinance(q) {
+    /* Open Yahoo Finance for a symbol in a new tab (dblclick on card). */
+    openYahooFinance(q) {
       if (!q) return;
-      const gf = { NMS: "NASDAQ", NGM: "NASDAQ", NCM: "NASDAQ",
-                   NYQ: "NYSE", PCX: "NYSEARCA", ARC: "NYSEARCA",
-                   ASE: "AMEX", AMX: "AMEX" };
-      const exch = gf[q.exchange];
-      const url = exch
-        ? `https://www.google.com/finance/quote/${q.symbol}:${exch}`
-        : `https://www.google.com/finance/search?q=${q.symbol}`;
-      window.open(url, "_blank", "noopener");
+      window.open(`https://finance.yahoo.com/quote/${q.symbol}`, "_blank", "noopener");
     },
 
     /* Momentum: return % over the trailing N trading days (from 1y daily closes).
